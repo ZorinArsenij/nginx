@@ -40,21 +40,7 @@ impl Worker {
                 };
                 let r = root.clone();
                 let resp = self::Worker::get_resp_from_req(r, req);
-
-                conn.write(
-                    format!(
-                        "HTTP/1.1 {} OK
-Date: Mon, 27 Jul 2009 12:28:53 GMT
-Server: Apache/2.2.14 (Win32)
-Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
-Content-Length: 0
-Content-Type: text/html",
-                        resp.status_code
-                    )
-                    .as_bytes(),
-                )
-                .unwrap();
-                conn.flush().unwrap();
+                self::Worker::write_to_conn(&mut conn, resp);
             }
         });
 
@@ -106,17 +92,22 @@ Content-Type: text/html",
             false => path.to_path_buf(),
         };
 
-        let filepath = match path_buf.canonicalize() {
+        let filepath = (match path_buf.canonicalize() {
             Ok(path) => path,
             Err(_) => {
                 resp.status_code = response::NOT_FOUND;
                 return resp;
             }
-        };
+        })
+        .clone();
 
         match req.method.as_str() {
-            "GET" => match File::open(filepath) {
+            "GET" => match File::open(&filepath) {
                 Ok(file) => {
+                    let lenght = file.metadata().unwrap().len();
+                    let ext = filepath.extension().unwrap().to_str().unwrap();
+                    resp.add_content_lenght(lenght);
+                    resp.add_content_type(ext);
                     resp.data = Some(file);
                 }
                 Err(_) => {
@@ -124,7 +115,12 @@ Content-Type: text/html",
                 }
             },
             "HEAD" => {
-                if !path.exists() {
+                if path.exists() {
+                    let lenght = path.metadata().unwrap().len();
+                    let ext = filepath.extension().unwrap().to_str().unwrap();
+                    resp.add_content_lenght(lenght);
+                    resp.add_content_type(ext);
+                } else {
                     resp.status_code = response::NOT_FOUND;
                 }
             }
@@ -135,5 +131,8 @@ Content-Type: text/html",
         resp
     }
 
-    fn write_to_conn(conn: &mut net::TcpStream) {}
+    fn write_to_conn(conn: &mut net::TcpStream, resp: response::Response) {
+        conn.write(resp.to_string().as_bytes()).unwrap();
+        conn.flush().unwrap();
+    }
 }
