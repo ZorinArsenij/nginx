@@ -41,11 +41,7 @@ pub fn parse(data: &[u8]) -> Result<Request> {
     let path = path_with_args.split("?").nth(0).unwrap();
 
     Ok(Request {
-        method: match parsed[0] {
-            "GET" => String::from("GET"),
-            "HEAD" => String::from("HEAD"),
-            _ => return Err(ParseError),
-        },
+        method: String::from(parsed[0]),
         path: path.to_string(),
     })
 }

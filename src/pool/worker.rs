@@ -86,7 +86,10 @@ impl Worker {
 
         let path_buf = match path.is_dir() {
             true => {
-                resp.status_code = response::FORBIDDEN;
+                if !path.join("index.html").exists() {
+                    resp.status_code = response::FORBIDDEN;
+                    return resp;
+                }
                 path.join("index.html")
             }
             false => path.to_path_buf(),
@@ -100,6 +103,10 @@ impl Worker {
             }
         })
         .clone();
+        if !filepath.starts_with(root) {
+            resp.status_code = response::FORBIDDEN;
+            return resp;
+        }
 
         match req.method.as_str() {
             "GET" => match File::open(&filepath) {
@@ -132,7 +139,7 @@ impl Worker {
     }
 
     fn write_to_conn(conn: &mut net::TcpStream, resp: response::Response) {
-        conn.write(resp.to_string().as_bytes()).unwrap();
+        resp.write_to_conn(conn);
         conn.flush().unwrap();
     }
 }
