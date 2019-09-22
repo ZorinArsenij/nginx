@@ -1,6 +1,8 @@
 use chrono::prelude::Utc;
 use std::collections::HashMap;
 use std::fs;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::net;
 
 pub const OK: u32 = 200;
 pub const FORBIDDEN: u32 = 403;
@@ -66,7 +68,7 @@ impl Response {
             .insert(String::from(CONTENT_TYPE), String::from(content_type));
     }
 
-    pub fn to_string(self) -> String {
+    pub fn write_to_conn(self, conn: &mut net::TcpStream) {
         let mut result = String::new();
         result.push_str(
             format!("{} {} {}{}", "HTTP/1.1", self.status_code, "IAmNginx", CRLF).as_str(),
@@ -74,6 +76,25 @@ impl Response {
         for (header, value) in &self.headers {
             result.push_str(format!("{}: {}{}", header, value, CRLF).as_str());
         }
-        result
+        result.push_str(CRLF);
+        conn.write(result.as_bytes()).unwrap();
+
+        match self.data {
+            Some(mut data) => {
+                let mut buf = [0; 1024 * 1024];
+                let mut offset: u64 = 0;
+                loop {
+                    match data.read(&mut buf).unwrap() {
+                        n => {
+                            offset += n as u64;
+                            conn.write(&buf[..n]).unwrap();
+                            data.seek(SeekFrom::Start(offset)).unwrap();
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        conn.flush().unwrap();
     }
 }
