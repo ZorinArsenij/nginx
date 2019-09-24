@@ -86,8 +86,14 @@ impl Response {
                 loop {
                     match data.read(&mut buf).unwrap() {
                         n => {
+                            if n == 0 {
+                                break;
+                            }
                             offset += n as u64;
-                            conn.write(&buf[..n]).unwrap();
+                            match conn.write(&buf[..n]) {
+                                Ok(_) => {}
+                                Err(_) => return,
+                            }
                             data.seek(SeekFrom::Start(offset)).unwrap();
                         }
                     }

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-const DEFAULT_THREAD_LIMIT: usize = 256;
+const DEFAULT_THREAD_LIMIT: usize = 4;
 const DEFAULT_DOCUMENT_ROOT: &str = "/var/www/html";
 
 const THREAD_LIMIT: &str = "thread_limit";

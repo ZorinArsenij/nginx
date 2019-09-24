@@ -1,6 +1,6 @@
 use crate::http::{request, response};
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net;
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
@@ -19,22 +19,16 @@ impl Worker {
         receiver: Arc<Mutex<mpsc::Receiver<net::TcpStream>>>,
     ) -> Worker {
         let thread = thread::spawn(move || {
-            let mut counter = 0;
             loop {
                 let mut conn = receiver.lock().unwrap().recv().unwrap();
 
                 // Debug
-                counter = counter + 1;
-                println!("Worker id {} receive {} request", id, counter);
-                //
+                // counter = counter + 1;
+                // println!("Worker id {} receive {} request", id, counter);
 
                 let req = match self::Worker::read_from_conn(&mut conn) {
-                    Ok(req) => {
-                        println!("Req: {:?}", req);
-                        req
-                    }
-                    Err(e) => {
-                        println!("Error: {}", e);
+                    Ok(req) => req,
+                    Err(_) => {
                         continue;
                     }
                 };
@@ -59,21 +53,14 @@ impl Worker {
                     return Err(request::ParseError);
                 }
             }
-            Err(e) => {
-                println!("Reading from connection failed: {}", e);
+            Err(_) => {
                 return Err(request::ParseError);
             }
         }
 
         match request::parse(&buf) {
-            Ok(req) => {
-                println!("Receive request {:?}", req);
-                Ok(req)
-            }
-            Err(e) => {
-                println!("Reading from connection failed: {}", e);
-                Err(request::ParseError)
-            }
+            Ok(req) => Ok(req),
+            Err(_) => Err(request::ParseError),
         }
 
         // println!("Receive {}", String::from_utf8(buf.to_vec()).unwrap());
@@ -112,7 +99,10 @@ impl Worker {
             "GET" => match File::open(&filepath) {
                 Ok(file) => {
                     let lenght = file.metadata().unwrap().len();
-                    let ext = filepath.extension().unwrap().to_str().unwrap();
+                    let ext = match filepath.extension() {
+                        Some(ext) => ext.to_str().unwrap(),
+                        None => "",
+                    };
                     resp.add_content_lenght(lenght);
                     resp.add_content_type(ext);
                     resp.data = Some(file);
@@ -140,6 +130,5 @@ impl Worker {
 
     fn write_to_conn(conn: &mut net::TcpStream, resp: response::Response) {
         resp.write_to_conn(conn);
-        conn.flush().unwrap();
     }
 }
